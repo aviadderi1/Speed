@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>מצלמה בדרך</title>
-<link rel="manifest" href='data:application/json,{"name":"מצלמה בדרך","short_name":"מצלמה בדרך","display":"standalone","background_color":"%230A0C0F","theme_color":"%230A0C0F","start_url":".","dir":"rtl","lang":"he"}'>
+<link rel="manifest" href='data:application/json,{"name":"מצלמה בדרך","short_name":"מצלמה בדרך","display":"fullscreen","background_color":"%230A0C0F","theme_color":"%230A0C0F","start_url":".","dir":"rtl","lang":"he"}'>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -75,38 +75,43 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 12px;display:flex;f
 
 /* ---------- מפה ברקע ---------- */
 #map{
-  position:absolute;inset:0;z-index:0;background:var(--panel);
-  filter:invert(1) hue-rotate(190deg) brightness(.82) contrast(.92) saturate(.55);
+  position:absolute;inset:0;z-index:0;background:#1a2129;
 }
 #driveHud.no-map #map{display:none}
 #driveHud > *:not(#map){position:relative;z-index:2}
 #hudTopFade,#hudBotFade{
   position:absolute;left:0;right:0;z-index:1;pointer-events:none;
 }
-#hudTopFade{top:0;height:46%;background:linear-gradient(180deg,rgba(10,12,15,.92) 20%,rgba(10,12,15,0))}
-#hudBotFade{bottom:0;height:40%;background:linear-gradient(0deg,rgba(10,12,15,.94) 30%,rgba(10,12,15,0))}
+#hudTopFade{top:0;height:44%;background:linear-gradient(180deg,rgba(10,12,15,.9) 15%,rgba(10,12,15,0))}
+#hudBotFade{bottom:0;height:38%;background:linear-gradient(0deg,rgba(10,12,15,.92) 25%,rgba(10,12,15,0))}
 #driveHud.no-map #hudTopFade,#driveHud.no-map #hudBotFade{background:transparent}
-.leaflet-control-attribution{filter:invert(1) hue-rotate(190deg);font-size:9px!important;opacity:.75}
+.leaflet-control-attribution{background:rgba(10,12,15,.55)!important;color:var(--muted)!important;font-size:9px!important}
+.leaflet-control-attribution a{color:var(--muted)!important}
 .leaflet-control-zoom{display:none}
-/* סמן הרכב */
+/* סמן הרכב — בסגנון Waze: חץ בתוך עיגול */
 .me-marker{
-  width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  width:46px;height:46px;border-radius:50%;
+  background:radial-gradient(circle at 50% 38%, #FFD37A, var(--amber) 70%);
+  border:3px solid #fff;
+  box-shadow:0 0 0 8px rgba(255,176,32,.22), 0 4px 14px rgba(0,0,0,.55);
+  display:flex;align-items:center;justify-content:center;
 }
 .me-marker .arrow{
-  width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;
-  border-bottom:22px solid var(--amber);
-  filter:drop-shadow(0 0 6px rgba(255,176,32,.9));
-  transform-origin:50% 65%;
+  width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;
+  border-bottom:24px solid #1A1204;
+  transform-origin:50% 62%;
+  margin-top:-4px;
+  border-radius:3px;
 }
-/* סמן מצלמה על המפה */
-.cam-marker{
-  width:34px;height:34px;border-radius:50%;background:var(--sign-white);
+/* סמן מצלמה על המפה — שלט עם "רגל" */
+.cam-pin{display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,.5))}
+.cam-pin .sign{
+  width:36px;height:36px;border-radius:50%;background:var(--sign-white);
   border:5px solid var(--red);display:flex;align-items:center;justify-content:center;
   color:#111;font-weight:900;font-size:13px;font-family:'Heebo',sans-serif;
-  box-shadow:0 2px 8px rgba(0,0,0,.7);
-  /* מבטל את היפוך הצבעים של המפה כדי שהשלט יישאר אדום-לבן */
-  filter:invert(1) hue-rotate(190deg) brightness(1.22) contrast(1.09) saturate(1.8);
 }
+.cam-pin .leg{width:3px;height:9px;background:#5a646e;border-radius:2px}
+.cam-pin.hot .sign{animation:signPulse .9s infinite}
 
 /* שלט מהירות מותרת — האלמנט המרכזי */
 .limit-sign{
@@ -350,6 +355,10 @@ nav button.active{color:var(--amber)}
       <div class="set-row"><label>רטט</label><label class="switch"><input type="checkbox" id="setVibe" checked><span class="slider"></span></label></div>
       <div class="set-row"><label>מסך דולק בזמן נסיעה</label><label class="switch"><input type="checkbox" id="setWake" checked><span class="slider"></span></label></div>
       <div class="set-row">
+        <div><label>מסך מלא בנסיעה</label><div class="hint">מסתיר את שורת הכתובת של הדפדפן</div></div>
+        <label class="switch"><input type="checkbox" id="setFull" checked><span class="slider"></span></label>
+      </div>
+      <div class="set-row">
         <div><label>מפה בזמן נסיעה</label><div class="hint">מפת דרכים חיה ברקע (דורש אינטרנט)</div></div>
         <label class="switch"><input type="checkbox" id="setMap" checked><span class="slider"></span></label>
       </div>
@@ -403,7 +412,7 @@ const SEED = [
 const LSK_CAMS="scam_cams_v1", LSK_SET="scam_set_v1";
 let cams = load(LSK_CAMS, null);
 if(!cams){ cams = SEED.slice(); save(LSK_CAMS, cams); }
-let settings = Object.assign({early:800, close:300, voice:true, beep:true, vibe:true, wake:true, moveOnly:true, map:true}, load(LSK_SET, {}));
+let settings = Object.assign({early:800, close:300, voice:true, beep:true, vibe:true, wake:true, moveOnly:true, map:true, full:true}, load(LSK_SET, {}));
 
 function load(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
 function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
@@ -465,6 +474,21 @@ function speak(text){
 }
 if("speechSynthesis" in window) speechSynthesis.getVoices();
 
+/* ================= מסך מלא ================= */
+function enterFullscreen(){
+  if(!settings.full) return;
+  const el=document.documentElement;
+  const fn=el.requestFullscreen||el.webkitRequestFullscreen;
+  if(fn){ try{ fn.call(el).catch(()=>{}); }catch(e){} }
+}
+function exitFullscreen(){
+  if(document.fullscreenElement||document.webkitFullscreenElement){
+    const fn=document.exitFullscreen||document.webkitExitFullscreen;
+    if(fn){ try{ fn.call(document).catch(()=>{}); }catch(e){} }
+  }
+}
+document.addEventListener("fullscreenchange", ()=>{ if(map) setTimeout(()=>map.invalidateSize(), 250); });
+
 /* ================= Wake Lock ================= */
 let wakeLock=null;
 async function acquireWake(){
@@ -474,36 +498,67 @@ async function acquireWake(){
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && driving) acquireWake(); });
 
 /* ================= מפה ================= */
-let map=null, meMarker=null, camMarkers=[];
+let map=null, meMarker=null, camMarkers={}, tileLayer=null, curMapNight=null, hotCamId=null;
+function isNight(){ const h=new Date().getHours(); return h>=18||h<6; }
+function tileUrl(night){
+  return night
+    ? "https://{s}.basemaps.cartocdn.com/rastertiles/dark_matter/{z}/{x}/{y}{r}.png"
+    : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
+}
 function initMap(lat,lon){
   if(!settings.map || typeof L==="undefined"){ $("driveHud").classList.add("no-map"); return; }
   $("driveHud").classList.remove("no-map");
   if(map){ map.setView([lat,lon]); return; }
   map=L.map("map",{zoomControl:false, attributionControl:true, dragging:false,
     touchZoom:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false, keyboard:false})
-    .setView([lat,lon], 15);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-    maxZoom:19, attribution:'© OpenStreetMap'
-  }).addTo(map);
-  meMarker=L.marker([lat,lon],{icon:L.divIcon({className:"", html:'<div class="me-marker"><div class="arrow" id="meArrow"></div></div>', iconSize:[26,26], iconAnchor:[13,13]}), interactive:false}).addTo(map);
+    .setView([lat,lon], 16);
+  curMapNight=isNight();
+  tileLayer=L.tileLayer(tileUrl(curMapNight),{maxZoom:19, subdomains:"abcd", attribution:'© OpenStreetMap © CARTO'}).addTo(map);
+  meMarker=L.marker([lat,lon],{icon:L.divIcon({className:"", html:'<div class="me-marker"><div class="arrow" id="meArrow"></div></div>', iconSize:[46,46], iconAnchor:[23,23]}), interactive:false, zIndexOffset:1000}).addTo(map);
   drawCamMarkers();
   setTimeout(()=>map.invalidateSize(), 200);
 }
 function drawCamMarkers(){
   if(!map) return;
-  camMarkers.forEach(m=>map.removeLayer(m));
-  camMarkers=cams.map(c=>
-    L.marker([c.lat,c.lon],{icon:L.divIcon({className:"", html:'<div class="cam-marker">'+c.limit+'</div>', iconSize:[34,34], iconAnchor:[17,17]}), interactive:false}).addTo(map)
-  );
+  Object.values(camMarkers).forEach(m=>map.removeLayer(m));
+  camMarkers={};
+  cams.forEach(c=>{
+    camMarkers[c.id]=L.marker([c.lat,c.lon],{icon:L.divIcon({className:"",
+      html:'<div class="cam-pin" id="pin_'+c.id+'"><div class="sign">'+c.limit+'</div><div class="leg"></div></div>',
+      iconSize:[36,50], iconAnchor:[18,48]}), interactive:false}).addTo(map);
+  });
+}
+function setHotCam(id){
+  if(hotCamId===id) return;
+  if(hotCamId){ const p=document.getElementById("pin_"+hotCamId); if(p) p.classList.remove("hot"); }
+  hotCamId=id;
+  if(id){ const p=document.getElementById("pin_"+id); if(p) p.classList.add("hot"); }
+}
+function speedZoom(){
+  if(curSpeedKmh>95) return 14;
+  if(curSpeedKmh>55) return 15;
+  return 16;
 }
 function updateMap(lat,lon){
   if(!map) return;
   meMarker.setLatLng([lat,lon]);
   const ar=document.getElementById("meArrow");
   if(ar && curHeading!==null) ar.style.transform="rotate("+curHeading+"deg)";
-  map.panTo([lat,lon],{animate:true, duration:.5});
+  // מצב יום/לילה מתחלף אוטומטית
+  const night=isNight();
+  if(night!==curMapNight && tileLayer){ curMapNight=night; tileLayer.setUrl(tileUrl(night)); }
+  // מרכוז "קדימה" כמו Waze — רואים יותר כביש לפני הרכב
+  let cLat=lat, cLon=lon;
+  if(curHeading!==null && curSpeedKmh>20){
+    const ahead=140+curSpeedKmh*2.2; // מטרים קדימה לפי מהירות
+    const rad=curHeading*Math.PI/180;
+    cLat=lat + (ahead*Math.cos(rad))/111320;
+    cLon=lon + (ahead*Math.sin(rad))/(111320*Math.cos(lat*Math.PI/180));
+  }
+  const z=speedZoom();
+  if(Math.abs(map.getZoom()-z)>=1) map.setZoomAround([lat,lon], z, {animate:true});
+  map.panTo([cLat,cLon],{animate:true, duration:.5});
 }
-function destroyMapDemoRefresh(){ if(map) drawCamMarkers(); }
 
 /* ================= מנוע הנסיעה ================= */
 let driving=false, watchId=null, demoTimer=null;
@@ -520,6 +575,7 @@ $("stopBtn").addEventListener("click", stopDrive);
 function startDrive(demo){
   initAudio();
   driving=true;
+  enterFullscreen();
   $("driveIdle").style.display="none";
   $("driveHud").classList.add("on");
   acquireWake();
@@ -532,6 +588,7 @@ function startDrive(demo){
 }
 function stopDrive(){
   driving=false;
+  exitFullscreen();
   if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
   if(demoTimer){ clearInterval(demoTimer); demoTimer=null; cams=cams.filter(c=>c.id!=="__demo__"); }
   if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
@@ -594,9 +651,11 @@ function tick(lat,lon){
   const moveOk = !settings.moveOnly || curSpeedKmh>25;
 
   if(!best || !moveOk){
+    setHotCam(null);
     renderHudIdle();
     return;
   }
+  setHotCam(best.id);
 
   const st=camState[best.id];
   if(bestD<=settings.close && st!=="close"){
@@ -805,7 +864,7 @@ function bindSet(id, key, isNum){
 }
 bindSet("setEarly","early",true); bindSet("setClose","close",true);
 bindSet("setVoice","voice"); bindSet("setBeep","beep"); bindSet("setVibe","vibe");
-bindSet("setWake","wake"); bindSet("setMoveOnly","moveOnly"); bindSet("setMap","map");
+bindSet("setWake","wake"); bindSet("setMoveOnly","moveOnly"); bindSet("setMap","map"); bindSet("setFull","full");
 $("setMap").addEventListener("change", ()=>{ $("driveHud").classList.toggle("no-map", !settings.map); });
 
 /* ================= טוסט ================= */
