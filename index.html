@@ -84,6 +84,10 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 12px;display:flex;f
 }
 #hudTopFade{top:0;height:44%;background:linear-gradient(180deg,rgba(10,12,15,.9) 15%,rgba(10,12,15,0))}
 #hudBotFade{bottom:0;height:38%;background:linear-gradient(0deg,rgba(10,12,15,.92) 25%,rgba(10,12,15,0))}
+#driveHud.day #hudTopFade{background:linear-gradient(180deg,rgba(246,247,243,.88) 15%,rgba(246,247,243,0))}
+#driveHud.day #hudBotFade{background:linear-gradient(0deg,rgba(246,247,243,.5) 25%,rgba(246,247,243,0))}
+#driveHud.day #alertTitle{color:#3d4650}
+#driveHud.day #stopBtn{color:#3d4650;border-color:rgba(0,0,0,.25)}
 #driveHud.no-map #hudTopFade,#driveHud.no-map #hudBotFade{background:transparent}
 .leaflet-control-attribution{background:rgba(10,12,15,.55)!important;color:var(--muted)!important;font-size:9px!important}
 .leaflet-control-attribution a{color:var(--muted)!important}
@@ -170,7 +174,22 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 12px;display:flex;f
   font-size:96px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;
   letter-spacing:-2px;
 }
-#curSpeed.over{color:var(--red)}
+/* מצב יום: ירוק עם קו מתאר שחור */
+#driveHud.day #curSpeed{
+  color:var(--green);
+  -webkit-text-stroke:3px #000;
+  paint-order:stroke fill;
+  text-shadow:0 2px 8px rgba(0,0,0,.45);
+}
+#driveHud.day #speedUnit{color:#1c2128;text-shadow:0 0 6px rgba(255,255,255,.7)}
+/* מצב לילה: לבן עם קו מתאר ירוק */
+#driveHud.night #curSpeed{
+  color:#fff;
+  -webkit-text-stroke:3px var(--green);
+  paint-order:stroke fill;
+  text-shadow:0 0 14px rgba(63,207,142,.35);
+}
+#curSpeed.over{color:var(--red)!important;-webkit-text-stroke:3px #fff!important}
 #speedUnit{font-size:14px;font-weight:600;color:var(--muted);letter-spacing:2px}
 #stopBtn{
   margin:14px 0 4px;background:transparent;color:var(--muted);border:1px solid var(--line);
@@ -506,13 +525,19 @@ function tileUrl(night){
     : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png";
 }
 function initMap(lat,lon){
-  if(!settings.map || typeof L==="undefined"){ $("driveHud").classList.add("no-map"); return; }
+  if(!settings.map || typeof L==="undefined"){
+    $("driveHud").classList.add("no-map","night");
+    $("driveHud").classList.remove("day");
+    return;
+  }
   $("driveHud").classList.remove("no-map");
   if(map){ map.setView([lat,lon]); return; }
   map=L.map("map",{zoomControl:false, attributionControl:true, dragging:false,
     touchZoom:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false, keyboard:false})
     .setView([lat,lon], 16);
   curMapNight=isNight();
+  $("driveHud").classList.toggle("night", curMapNight);
+  $("driveHud").classList.toggle("day", !curMapNight);
   tileLayer=L.tileLayer(tileUrl(curMapNight),{maxZoom:19, subdomains:"abcd", attribution:'© OpenStreetMap © CARTO'}).addTo(map);
   meMarker=L.marker([lat,lon],{icon:L.divIcon({className:"", html:'<div class="me-marker"><div class="arrow" id="meArrow"></div></div>', iconSize:[46,46], iconAnchor:[23,23]}), interactive:false, zIndexOffset:1000}).addTo(map);
   drawCamMarkers();
@@ -546,7 +571,11 @@ function updateMap(lat,lon){
   if(ar && curHeading!==null) ar.style.transform="rotate("+curHeading+"deg)";
   // מצב יום/לילה מתחלף אוטומטית
   const night=isNight();
-  if(night!==curMapNight && tileLayer){ curMapNight=night; tileLayer.setUrl(tileUrl(night)); }
+  if(night!==curMapNight && tileLayer){
+    curMapNight=night; tileLayer.setUrl(tileUrl(night));
+    $("driveHud").classList.toggle("night", night);
+    $("driveHud").classList.toggle("day", !night);
+  }
   // מרכוז "קדימה" כמו Waze — רואים יותר כביש לפני הרכב
   let cLat=lat, cLon=lon;
   if(curHeading!==null && curSpeedKmh>20){
