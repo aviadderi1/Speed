@@ -11,6 +11,8 @@
 <link rel="manifest" href='data:application/json,{"name":"מצלמה בדרך","short_name":"מצלמה בדרך","display":"standalone","background_color":"%230A0C0F","theme_color":"%230A0C0F","start_url":".","dir":"rtl","lang":"he"}'>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{
   --asphalt:#0A0C0F;
@@ -68,8 +70,43 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 12px;display:flex;f
 }
 #startBtn:active{transform:scale(.97)}
 
-#driveHud{flex:1;display:none;flex-direction:column;align-items:center;justify-content:space-between;padding-top:4px}
+#driveHud{flex:1;display:none;flex-direction:column;align-items:center;justify-content:space-between;padding-top:4px;position:relative;overflow:hidden;border-radius:var(--radius);margin:0 -6px}
 #driveHud.on{display:flex}
+
+/* ---------- מפה ברקע ---------- */
+#map{
+  position:absolute;inset:0;z-index:0;background:var(--panel);
+  filter:invert(1) hue-rotate(190deg) brightness(.82) contrast(.92) saturate(.55);
+}
+#driveHud.no-map #map{display:none}
+#driveHud > *:not(#map){position:relative;z-index:2}
+#hudTopFade,#hudBotFade{
+  position:absolute;left:0;right:0;z-index:1;pointer-events:none;
+}
+#hudTopFade{top:0;height:46%;background:linear-gradient(180deg,rgba(10,12,15,.92) 20%,rgba(10,12,15,0))}
+#hudBotFade{bottom:0;height:40%;background:linear-gradient(0deg,rgba(10,12,15,.94) 30%,rgba(10,12,15,0))}
+#driveHud.no-map #hudTopFade,#driveHud.no-map #hudBotFade{background:transparent}
+.leaflet-control-attribution{filter:invert(1) hue-rotate(190deg);font-size:9px!important;opacity:.75}
+.leaflet-control-zoom{display:none}
+/* סמן הרכב */
+.me-marker{
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+}
+.me-marker .arrow{
+  width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;
+  border-bottom:22px solid var(--amber);
+  filter:drop-shadow(0 0 6px rgba(255,176,32,.9));
+  transform-origin:50% 65%;
+}
+/* סמן מצלמה על המפה */
+.cam-marker{
+  width:34px;height:34px;border-radius:50%;background:var(--sign-white);
+  border:5px solid var(--red);display:flex;align-items:center;justify-content:center;
+  color:#111;font-weight:900;font-size:13px;font-family:'Heebo',sans-serif;
+  box-shadow:0 2px 8px rgba(0,0,0,.7);
+  /* מבטל את היפוך הצבעים של המפה כדי שהשלט יישאר אדום-לבן */
+  filter:invert(1) hue-rotate(190deg) brightness(1.22) contrast(1.09) saturate(1.8);
+}
 
 /* שלט מהירות מותרת — האלמנט המרכזי */
 .limit-sign{
@@ -253,6 +290,9 @@ nav button.active{color:var(--amber)}
     </div>
 
     <div id="driveHud">
+      <div id="map"></div>
+      <div id="hudTopFade"></div>
+      <div id="hudBotFade"></div>
       <div id="alertZone">
         <div class="limit-sign" id="hudSign"><span class="nolimit">אין מצלמה<br>בקרבתך</span></div>
         <div id="alertTitle">נוסע... סורק מצלמות בסביבה</div>
@@ -310,6 +350,10 @@ nav button.active{color:var(--amber)}
       <div class="set-row"><label>רטט</label><label class="switch"><input type="checkbox" id="setVibe" checked><span class="slider"></span></label></div>
       <div class="set-row"><label>מסך דולק בזמן נסיעה</label><label class="switch"><input type="checkbox" id="setWake" checked><span class="slider"></span></label></div>
       <div class="set-row">
+        <div><label>מפה בזמן נסיעה</label><div class="hint">מפת דרכים חיה ברקע (דורש אינטרנט)</div></div>
+        <label class="switch"><input type="checkbox" id="setMap" checked><span class="slider"></span></label>
+      </div>
+      <div class="set-row">
         <div><label>התראות רק בנסיעה</label><div class="hint">מעל 25 קמ״ש — מונע התראות בהליכה</div></div>
         <label class="switch"><input type="checkbox" id="setMoveOnly" checked><span class="slider"></span></label>
       </div>
@@ -359,11 +403,11 @@ const SEED = [
 const LSK_CAMS="scam_cams_v1", LSK_SET="scam_set_v1";
 let cams = load(LSK_CAMS, null);
 if(!cams){ cams = SEED.slice(); save(LSK_CAMS, cams); }
-let settings = Object.assign({early:800, close:300, voice:true, beep:true, vibe:true, wake:true, moveOnly:true}, load(LSK_SET, {}));
+let settings = Object.assign({early:800, close:300, voice:true, beep:true, vibe:true, wake:true, moveOnly:true, map:true}, load(LSK_SET, {}));
 
 function load(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
 function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
-function saveCams(){ save(LSK_CAMS, cams); renderCamList(); }
+function saveCams(){ save(LSK_CAMS, cams); renderCamList(); if(typeof drawCamMarkers==="function" && map) drawCamMarkers(); }
 
 /* ================= ניווט מסכים ================= */
 document.querySelectorAll("nav button").forEach(b=>{
@@ -429,6 +473,38 @@ async function acquireWake(){
 }
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && driving) acquireWake(); });
 
+/* ================= מפה ================= */
+let map=null, meMarker=null, camMarkers=[];
+function initMap(lat,lon){
+  if(!settings.map || typeof L==="undefined"){ $("driveHud").classList.add("no-map"); return; }
+  $("driveHud").classList.remove("no-map");
+  if(map){ map.setView([lat,lon]); return; }
+  map=L.map("map",{zoomControl:false, attributionControl:true, dragging:false,
+    touchZoom:false, scrollWheelZoom:false, doubleClickZoom:false, boxZoom:false, keyboard:false})
+    .setView([lat,lon], 15);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+    maxZoom:19, attribution:'© OpenStreetMap'
+  }).addTo(map);
+  meMarker=L.marker([lat,lon],{icon:L.divIcon({className:"", html:'<div class="me-marker"><div class="arrow" id="meArrow"></div></div>', iconSize:[26,26], iconAnchor:[13,13]}), interactive:false}).addTo(map);
+  drawCamMarkers();
+  setTimeout(()=>map.invalidateSize(), 200);
+}
+function drawCamMarkers(){
+  if(!map) return;
+  camMarkers.forEach(m=>map.removeLayer(m));
+  camMarkers=cams.map(c=>
+    L.marker([c.lat,c.lon],{icon:L.divIcon({className:"", html:'<div class="cam-marker">'+c.limit+'</div>', iconSize:[34,34], iconAnchor:[17,17]}), interactive:false}).addTo(map)
+  );
+}
+function updateMap(lat,lon){
+  if(!map) return;
+  meMarker.setLatLng([lat,lon]);
+  const ar=document.getElementById("meArrow");
+  if(ar && curHeading!==null) ar.style.transform="rotate("+curHeading+"deg)";
+  map.panTo([lat,lon],{animate:true, duration:.5});
+}
+function destroyMapDemoRefresh(){ if(map) drawCamMarkers(); }
+
 /* ================= מנוע הנסיעה ================= */
 let driving=false, watchId=null, demoTimer=null;
 let lastPos=null, lastTime=0, curSpeedKmh=0, curHeading=null;
@@ -449,7 +525,7 @@ function startDrive(demo){
   acquireWake();
   Object.keys(camState).forEach(k=>delete camState[k]);
   Object.keys(lastDist).forEach(k=>delete lastDist[k]);
-  if(demo){ runDemo(); return; }
+  if(demo) return;
   if(!("geolocation" in navigator)){ setGps("err","אין GPS"); return; }
   setGps("", "מאתר...");
   watchId=navigator.geolocation.watchPosition(onPos, onGpsErr, {enableHighAccuracy:true, maximumAge:1000, timeout:15000});
@@ -493,6 +569,8 @@ function onPos(pos){
 
 function tick(lat,lon){
   $("curSpeed").textContent=Math.round(curSpeedKmh);
+  if(!map) initMap(lat,lon);
+  updateMap(lat,lon);
 
   // מציאת המצלמה הרלוונטית הקרובה ביותר
   let best=null, bestD=Infinity;
@@ -574,6 +652,7 @@ $("demoBtn").addEventListener("click", ()=>{
   const camLat=baseLat+1500/111320;
   cams=cams.filter(c=>c.id!=="__demo__");
   cams.push({id:"__demo__", name:"מצלמת הדגמה", road:"דמו", lat:camLat, lon:baseLon, limit:90, approx:false});
+  drawCamMarkers();
   startDrive(true);
   let lat=baseLat, speedKmh=92;
   curHeading=0;
@@ -726,7 +805,8 @@ function bindSet(id, key, isNum){
 }
 bindSet("setEarly","early",true); bindSet("setClose","close",true);
 bindSet("setVoice","voice"); bindSet("setBeep","beep"); bindSet("setVibe","vibe");
-bindSet("setWake","wake"); bindSet("setMoveOnly","moveOnly");
+bindSet("setWake","wake"); bindSet("setMoveOnly","moveOnly"); bindSet("setMap","map");
+$("setMap").addEventListener("change", ()=>{ $("driveHud").classList.toggle("no-map", !settings.map); });
 
 /* ================= טוסט ================= */
 let toastT=null;
