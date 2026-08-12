@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0A0C0F">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>מצלמה בדרך</title>
+<link rel="manifest" href='data:application/json,{"name":"מצלמה בדרך","short_name":"מצלמה בדרך","display":"standalone","background_color":"%230A0C0F","theme_color":"%230A0C0F","start_url":".","dir":"rtl","lang":"he"}'>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --asphalt:#0A0C0F;
+  --panel:#12161B;
+  --panel-2:#171C22;
+  --line:#242B34;
+  --paint:#EDF1EE;
+  --muted:#8792A0;
+  --amber:#FFB020;
+  --red:#E03C3C;
+  --green:#3FCF8E;
+  --sign-white:#F7F7F2;
+  --radius:16px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{
+  background:var(--asphalt);
+  color:var(--paint);
+  font-family:'Heebo',-apple-system,'Segoe UI',Roboto,Arial,sans-serif;
+  display:flex;flex-direction:column;
+  user-select:none;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+}
+body.alert-close{animation:bgPulse 1s infinite}
+@keyframes bgPulse{0%,100%{background:var(--asphalt)}50%{background:#2A0E0E}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px 8px;
+}
+header h1{font-size:17px;font-weight:800;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+header h1 .cam-ico{font-size:15px;opacity:.85}
+#gpsChip{
+  font-size:12px;font-weight:600;color:var(--muted);
+  border:1px solid var(--line);border-radius:99px;padding:4px 10px;
+  display:flex;align-items:center;gap:6px;
+}
+#gpsChip .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+#gpsChip.ok .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
+#gpsChip.err .dot{background:var(--red)}
+
+main{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 12px;display:flex;flex-direction:column}
+.screen{display:none;flex:1;flex-direction:column}
+.screen.active{display:flex}
+
+/* ---------- מסך נסיעה ---------- */
+#driveIdle{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;text-align:center}
+#driveIdle p{color:var(--muted);font-size:14px;max-width:280px;line-height:1.6}
+#startBtn{
+  background:var(--amber);color:#1A1204;border:none;border-radius:99px;
+  font-family:inherit;font-size:20px;font-weight:900;padding:18px 46px;cursor:pointer;
+  box-shadow:0 0 0 6px rgba(255,176,32,.12), 0 8px 30px rgba(255,176,32,.25);
+}
+#startBtn:active{transform:scale(.97)}
+
+#driveHud{flex:1;display:none;flex-direction:column;align-items:center;justify-content:space-between;padding-top:4px}
+#driveHud.on{display:flex}
+
+/* שלט מהירות מותרת — האלמנט המרכזי */
+.limit-sign{
+  width:110px;height:110px;border-radius:50%;
+  background:var(--sign-white);
+  border:14px solid var(--red);
+  display:flex;align-items:center;justify-content:center;
+  color:#111;font-weight:900;font-size:44px;line-height:1;
+  font-variant-numeric:tabular-nums;
+  transition:width .5s,height .5s,font-size .5s;
+  box-shadow:0 4px 24px rgba(0,0,0,.6);
+  flex-shrink:0;
+}
+.limit-sign.big{width:150px;height:150px;font-size:64px}
+.limit-sign.pulse{animation:signPulse .9s infinite}
+@keyframes signPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,60,60,.55)}50%{box-shadow:0 0 0 22px rgba(224,60,60,0)}}
+.limit-sign .nolimit{font-size:15px;font-weight:800;color:#555}
+
+#alertZone{
+  width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;
+  min-height:200px;justify-content:center;
+}
+#alertTitle{font-size:15px;font-weight:600;color:var(--muted);text-align:center}
+#alertTitle.warn{color:var(--amber);font-weight:800;font-size:17px}
+#alertTitle.danger{color:var(--red);font-weight:900;font-size:19px}
+#alertDist{
+  font-size:42px;font-weight:900;font-variant-numeric:tabular-nums;
+  color:var(--amber);display:none;line-height:1;
+}
+#alertDist small{font-size:16px;font-weight:600;color:var(--muted)}
+#alertDist.show{display:block}
+#alertDist.danger{color:var(--red)}
+
+/* פס נתיב — סימוני כביש שמתמלאים ככל שמתקרבים */
+#laneWrap{width:82%;max-width:340px;display:none;flex-direction:column;gap:4px}
+#laneWrap.show{display:flex}
+#lane{
+  height:14px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);
+  position:relative;overflow:hidden;
+}
+#lane::after{
+  content:"";position:absolute;inset:0;
+  background-image:repeating-linear-gradient(90deg,transparent 0 14px,rgba(237,241,238,.25) 14px 26px);
+}
+#laneFill{
+  position:absolute;top:0;bottom:0;right:0;width:0%;
+  background:linear-gradient(270deg,var(--amber),rgba(255,176,32,.25));
+  transition:width .4s linear;
+}
+#laneFill.danger{background:linear-gradient(270deg,var(--red),rgba(224,60,60,.3))}
+#laneLabels{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+
+/* מד מהירות נוכחית */
+#speedCluster{display:flex;flex-direction:column;align-items:center;gap:2px;padding-bottom:6px}
+#curSpeed{
+  font-size:96px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums;
+  letter-spacing:-2px;
+}
+#curSpeed.over{color:var(--red)}
+#speedUnit{font-size:14px;font-weight:600;color:var(--muted);letter-spacing:2px}
+#stopBtn{
+  margin:14px 0 4px;background:transparent;color:var(--muted);border:1px solid var(--line);
+  border-radius:99px;font-family:inherit;font-size:14px;font-weight:600;padding:10px 26px;cursor:pointer;
+}
+
+/* ---------- רשימת מצלמות ---------- */
+.toolbar{display:flex;gap:8px;margin:6px 0 12px;flex-wrap:wrap}
+.btn{
+  background:var(--panel-2);color:var(--paint);border:1px solid var(--line);
+  border-radius:12px;font-family:inherit;font-size:13.5px;font-weight:600;
+  padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:6px;
+}
+.btn.primary{background:var(--amber);color:#1A1204;border-color:var(--amber);font-weight:800}
+.btn:active{transform:scale(.97)}
+#searchBox{
+  width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  color:var(--paint);font-family:inherit;font-size:15px;padding:11px 14px;margin-bottom:10px;
+}
+#searchBox::placeholder{color:var(--muted)}
+.cam-row{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;
+}
+.cam-row .mini-sign{
+  width:44px;height:44px;border-radius:50%;background:var(--sign-white);border:6px solid var(--red);
+  display:flex;align-items:center;justify-content:center;color:#111;font-weight:900;font-size:16px;flex-shrink:0;
+}
+.cam-row .info{flex:1;min-width:0}
+.cam-row .name{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cam-row .sub{font-size:12px;color:var(--muted);display:flex;gap:8px;margin-top:2px}
+.cam-row .approx{color:var(--amber)}
+.cam-row .actions{display:flex;gap:4px}
+.icon-btn{
+  background:transparent;border:none;color:var(--muted);font-size:17px;cursor:pointer;padding:6px;
+}
+.empty{color:var(--muted);text-align:center;padding:40px 20px;font-size:14px;line-height:1.7}
+
+/* ---------- הגדרות ---------- */
+.set-group{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:4px 14px;margin-bottom:12px}
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid var(--line);gap:12px}
+.set-row:last-child{border-bottom:none}
+.set-row label{font-size:14.5px;font-weight:600}
+.set-row .hint{font-size:11.5px;color:var(--muted);font-weight:400;margin-top:2px}
+.set-row select{
+  background:var(--panel-2);color:var(--paint);border:1px solid var(--line);border-radius:10px;
+  font-family:inherit;font-size:14px;padding:8px 10px;
+}
+.switch{position:relative;width:48px;height:28px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{
+  position:absolute;cursor:pointer;inset:0;background:var(--panel-2);border:1px solid var(--line);
+  border-radius:99px;transition:.25s;
+}
+.slider::before{
+  content:"";position:absolute;height:20px;width:20px;right:3px;top:3px;
+  background:var(--muted);border-radius:50%;transition:.25s;
+}
+input:checked + .slider{background:rgba(255,176,32,.25);border-color:var(--amber)}
+input:checked + .slider::before{transform:translateX(-20px);background:var(--amber)}
+.note{font-size:12px;color:var(--muted);line-height:1.7;padding:4px 4px 10px}
+
+/* ---------- ניווט תחתון ---------- */
+nav{
+  display:flex;border-top:1px solid var(--line);background:var(--panel);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav button{
+  flex:1;background:transparent;border:none;color:var(--muted);font-family:inherit;
+  font-size:12px;font-weight:600;padding:10px 0 12px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+nav button .ico{font-size:21px;line-height:1}
+nav button.active{color:var(--amber)}
+
+/* ---------- מודאל ---------- */
+#modal{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;
+  align-items:flex-end;justify-content:center;z-index:50;
+}
+#modal.show{display:flex}
+#modalCard{
+  background:var(--panel);border:1px solid var(--line);border-radius:20px 20px 0 0;
+  width:100%;max-width:520px;padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+  max-height:85vh;overflow-y:auto;
+}
+#modalCard h3{font-size:17px;font-weight:800;margin-bottom:14px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:5px}
+.field input,.field textarea{
+  width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;
+  color:var(--paint);font-family:inherit;font-size:15px;padding:11px 13px;
+}
+.field textarea{min-height:120px;direction:ltr;font-size:12.5px}
+.row2{display:flex;gap:10px}
+.row2 .field{flex:1}
+.modal-actions{display:flex;gap:10px;margin-top:6px}
+.modal-actions .btn{flex:1;justify-content:center;padding:13px}
+#toast{
+  position:fixed;bottom:90px;right:50%;transform:translateX(50%);
+  background:var(--panel-2);border:1px solid var(--line);color:var(--paint);
+  padding:10px 18px;border-radius:99px;font-size:13.5px;font-weight:600;
+  opacity:0;transition:opacity .3s;pointer-events:none;z-index:60;white-space:nowrap;
+}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="cam-ico">📷</span> מצלמה בדרך</h1>
+  <div id="gpsChip"><span class="dot"></span><span id="gpsText">GPS כבוי</span></div>
+</header>
+
+<main>
+  <!-- מסך נסיעה -->
+  <section class="screen active" id="screen-drive">
+    <div id="driveIdle">
+      <div class="limit-sign big" id="idleSign"><span class="nolimit">מוכן<br>לדרך</span></div>
+      <p>האפליקציה תתריע קולית לפני כל מצלמת מהירות ותציג את המהירות המותרת בקטע.</p>
+      <button id="startBtn">התחל נסיעה</button>
+    </div>
+
+    <div id="driveHud">
+      <div id="alertZone">
+        <div class="limit-sign" id="hudSign"><span class="nolimit">אין מצלמה<br>בקרבתך</span></div>
+        <div id="alertTitle">נוסע... סורק מצלמות בסביבה</div>
+        <div id="alertDist">— <small>מטר</small></div>
+        <div id="laneWrap">
+          <div id="lane"><div id="laneFill"></div></div>
+          <div id="laneLabels"><span id="laneFar">—</span><span>📷 מצלמה</span></div>
+        </div>
+      </div>
+
+      <div id="speedCluster">
+        <div id="curSpeed">0</div>
+        <div id="speedUnit">קמ״ש</div>
+        <button id="stopBtn">סיים נסיעה</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- מסך מצלמות -->
+  <section class="screen" id="screen-cams">
+    <div class="toolbar">
+      <button class="btn primary" id="addHereBtn">📍 הוסף במיקומי</button>
+      <button class="btn" id="addManualBtn">➕ ידני</button>
+      <button class="btn" id="exportBtn">⬆ ייצוא</button>
+      <button class="btn" id="importBtn">⬇ ייבוא</button>
+    </div>
+    <input id="searchBox" type="search" placeholder="חיפוש לפי שם או כביש...">
+    <div id="camList"></div>
+  </section>
+
+  <!-- מסך הגדרות -->
+  <section class="screen" id="screen-settings">
+    <div class="set-group">
+      <div class="set-row">
+        <div><label>מרחק התראה מוקדמת</label><div class="hint">ההכרזה הקולית הראשונה</div></div>
+        <select id="setEarly">
+          <option value="500">500 מ׳</option>
+          <option value="800" selected>800 מ׳</option>
+          <option value="1000">1000 מ׳</option>
+          <option value="1500">1500 מ׳</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div><label>מרחק התראה דחופה</label><div class="hint">צפצוף + הבהוב אדום</div></div>
+        <select id="setClose">
+          <option value="200">200 מ׳</option>
+          <option value="300" selected>300 מ׳</option>
+          <option value="400">400 מ׳</option>
+        </select>
+      </div>
+    </div>
+    <div class="set-group">
+      <div class="set-row"><label>הכרזה קולית</label><label class="switch"><input type="checkbox" id="setVoice" checked><span class="slider"></span></label></div>
+      <div class="set-row"><label>צפצוף</label><label class="switch"><input type="checkbox" id="setBeep" checked><span class="slider"></span></label></div>
+      <div class="set-row"><label>רטט</label><label class="switch"><input type="checkbox" id="setVibe" checked><span class="slider"></span></label></div>
+      <div class="set-row"><label>מסך דולק בזמן נסיעה</label><label class="switch"><input type="checkbox" id="setWake" checked><span class="slider"></span></label></div>
+      <div class="set-row">
+        <div><label>התראות רק בנסיעה</label><div class="hint">מעל 25 קמ״ש — מונע התראות בהליכה</div></div>
+        <label class="switch"><input type="checkbox" id="setMoveOnly" checked><span class="slider"></span></label>
+      </div>
+    </div>
+    <div class="set-group">
+      <div class="set-row">
+        <div><label>מצב הדגמה</label><div class="hint">מדמה התקרבות למצלמה — לבדיקה בבית</div></div>
+        <button class="btn" id="demoBtn">▶ הפעל</button>
+      </div>
+    </div>
+    <p class="note">⚠️ מאגר המצלמות המובנה מבוסס על מיקומים שפורסמו לציבור והוא <b>משוער</b> — מומלץ לאמת מול המפה הרשמית (govmap.gov.il, שכבת "מצלמות אכיפה") ולעדכן דרך מסך המצלמות. האפליקציה היא כלי עזר בלבד — האחריות על הנהיגה ועל שמירת החוק היא תמיד על הנהג.</p>
+  </section>
+</main>
+
+<nav>
+  <button data-screen="drive" class="active"><span class="ico">🚗</span>נסיעה</button>
+  <button data-screen="cams"><span class="ico">📷</span>מצלמות</button>
+  <button data-screen="settings"><span class="ico">⚙️</span>הגדרות</button>
+</nav>
+
+<div id="modal">
+  <div id="modalCard"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ================= מאגר התחלתי (משוער!) ================= */
+const SEED_VERSION = 1;
+const SEED = [
+  ["צומת גולני — כביש 65", "65", 32.7702, 35.3246, 90],
+  ["צומת מגידו — כביש 65", "65", 32.5726, 35.1898, 90],
+  ["צומת דברת — כביש 65", "65", 32.6560, 35.3210, 90],
+  ["צומת יגור — כביש 70/75", "75", 32.7413, 35.0781, 90],
+  ["צומת נהלל — כביש 73/75", "75", 32.6889, 35.1994, 90],
+  ["צומת השומרים — כביש 70", "70", 32.7080, 35.1130, 90],
+  ["צומת חגור — כביש 444", "444", 32.1493, 34.9648, 80],
+  ["צומת בילו — כביש 40", "40", 31.8699, 34.8224, 80],
+  ["צומת קסטינה — כביש 3/40", "40", 31.7440, 34.7550, 90],
+  ["צומת פלוגות — כביש 35/40", "40", 31.6272, 34.7080, 90],
+  ["צומת בית קמה — כביש 40", "40", 31.4443, 34.7616, 90],
+  ["צומת גילת — כביש 25", "25", 31.3282, 34.6519, 90],
+].map((c,i)=>({id:"seed"+i, name:c[0], road:c[1], lat:c[2], lon:c[3], limit:c[4], approx:true}));
+
+/* ================= אחסון ================= */
+const LSK_CAMS="scam_cams_v1", LSK_SET="scam_set_v1";
+let cams = load(LSK_CAMS, null);
+if(!cams){ cams = SEED.slice(); save(LSK_CAMS, cams); }
+let settings = Object.assign({early:800, close:300, voice:true, beep:true, vibe:true, wake:true, moveOnly:true}, load(LSK_SET, {}));
+
+function load(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch(e){ return d; } }
+function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function saveCams(){ save(LSK_CAMS, cams); renderCamList(); }
+
+/* ================= ניווט מסכים ================= */
+document.querySelectorAll("nav button").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    document.getElementById("screen-"+b.dataset.screen).classList.add("active");
+    if(b.dataset.screen==="cams") renderCamList();
+  });
+});
+
+/* ================= גיאומטריה ================= */
+const R=6371000;
+function dist(lat1,lon1,lat2,lon2){
+  const p1=lat1*Math.PI/180, p2=lat2*Math.PI/180;
+  const dp=(lat2-lat1)*Math.PI/180, dl=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dp/2)**2 + Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+function bearing(lat1,lon1,lat2,lon2){
+  const p1=lat1*Math.PI/180, p2=lat2*Math.PI/180, dl=(lon2-lon1)*Math.PI/180;
+  const y=Math.sin(dl)*Math.cos(p2);
+  const x=Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function angDiff(a,b){ let d=Math.abs(a-b)%360; return d>180?360-d:d; }
+
+/* ================= קול, צליל, רטט ================= */
+let audioCtx=null;
+function initAudio(){ if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(audioCtx&&audioCtx.state==="suspended") audioCtx.resume(); }
+function beep(pattern){
+  if(!settings.beep || !audioCtx) return;
+  let t=audioCtx.currentTime;
+  pattern.forEach(([f,dur])=>{
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.type="square"; o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.35,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(t); o.stop(t+dur+0.02);
+    t+=dur+0.08;
+  });
+}
+function vibrate(p){ if(settings.vibe && navigator.vibrate) navigator.vibrate(p); }
+function speak(text){
+  if(!settings.voice || !("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang="he-IL"; u.rate=1.05;
+  const v=speechSynthesis.getVoices().find(v=>v.lang && v.lang.startsWith("he"));
+  if(v) u.voice=v;
+  speechSynthesis.speak(u);
+}
+if("speechSynthesis" in window) speechSynthesis.getVoices();
+
+/* ================= Wake Lock ================= */
+let wakeLock=null;
+async function acquireWake(){
+  if(!settings.wake || !("wakeLock" in navigator)) return;
+  try{ wakeLock=await navigator.wakeLock.request("screen"); }catch(e){}
+}
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && driving) acquireWake(); });
+
+/* ================= מנוע הנסיעה ================= */
+let driving=false, watchId=null, demoTimer=null;
+let lastPos=null, lastTime=0, curSpeedKmh=0, curHeading=null;
+const camState={}; // id -> "early" | "close" | "passed"
+const lastDist={}; // id -> מרחק קודם
+
+const $=id=>document.getElementById(id);
+const gpsChip=$("gpsChip"), gpsText=$("gpsText");
+
+$("startBtn").addEventListener("click", ()=>startDrive(false));
+$("stopBtn").addEventListener("click", stopDrive);
+
+function startDrive(demo){
+  initAudio();
+  driving=true;
+  $("driveIdle").style.display="none";
+  $("driveHud").classList.add("on");
+  acquireWake();
+  Object.keys(camState).forEach(k=>delete camState[k]);
+  Object.keys(lastDist).forEach(k=>delete lastDist[k]);
+  if(demo){ runDemo(); return; }
+  if(!("geolocation" in navigator)){ setGps("err","אין GPS"); return; }
+  setGps("", "מאתר...");
+  watchId=navigator.geolocation.watchPosition(onPos, onGpsErr, {enableHighAccuracy:true, maximumAge:1000, timeout:15000});
+}
+function stopDrive(){
+  driving=false;
+  if(watchId!==null){ navigator.geolocation.clearWatch(watchId); watchId=null; }
+  if(demoTimer){ clearInterval(demoTimer); demoTimer=null; cams=cams.filter(c=>c.id!=="__demo__"); }
+  if(wakeLock){ wakeLock.release().catch(()=>{}); wakeLock=null; }
+  speechSynthesis && speechSynthesis.cancel();
+  document.body.classList.remove("alert-close");
+  $("driveHud").classList.remove("on");
+  $("driveIdle").style.display="flex";
+  setGps("","GPS כבוי");
+  lastPos=null; curSpeedKmh=0; curHeading=null;
+}
+function setGps(cls,txt){ gpsChip.className=""; if(cls) gpsChip.classList.add(cls); gpsText.textContent=txt; }
+function onGpsErr(e){
+  setGps("err", e.code===1 ? "אין הרשאת מיקום" : "GPS לא זמין");
+}
+
+function onPos(pos){
+  const {latitude:lat, longitude:lon, speed, heading, accuracy}=pos.coords;
+  const now=pos.timestamp||Date.now();
+  setGps("ok", "GPS פעיל · דיוק "+Math.round(accuracy)+" מ׳");
+
+  // מהירות: מה-GPS, או נגזרת ממיקומים עוקבים
+  if(speed!==null && !isNaN(speed)) curSpeedKmh=speed*3.6;
+  else if(lastPos){
+    const d=dist(lastPos.lat,lastPos.lon,lat,lon), dt=(now-lastTime)/1000;
+    if(dt>0.5 && d<400) curSpeedKmh=(d/dt)*3.6;
+  }
+  if(heading!==null && !isNaN(heading)) curHeading=heading;
+  else if(lastPos){
+    const d=dist(lastPos.lat,lastPos.lon,lat,lon);
+    if(d>6) curHeading=bearing(lastPos.lat,lastPos.lon,lat,lon);
+  }
+  lastPos={lat,lon}; lastTime=now;
+  tick(lat,lon);
+}
+
+function tick(lat,lon){
+  $("curSpeed").textContent=Math.round(curSpeedKmh);
+
+  // מציאת המצלמה הרלוונטית הקרובה ביותר
+  let best=null, bestD=Infinity;
+  for(const c of cams){
+    const d=dist(lat,lon,c.lat,c.lon);
+    const prev=lastDist[c.id];
+    lastDist[c.id]=d;
+    if(d>settings.early*1.6){ camState[c.id]=undefined; continue; }
+    // "מתקרב" = הכיוון שלי לעבר המצלמה, או שהמרחק קטן
+    let approaching=true;
+    if(curHeading!==null){
+      approaching = angDiff(curHeading, bearing(lat,lon,c.lat,c.lon)) < 80;
+    }
+    if(prev!==undefined && prev < d-8) approaching=false; // מתרחק בבירור
+    if(camState[c.id]==="passed") continue;
+    if(!approaching && camState[c.id]===undefined) continue;
+    if(!approaching && d<150){ camState[c.id]="passed"; continue; }
+    if(d<bestD){ bestD=d; best=c; }
+  }
+
+  const moveOk = !settings.moveOnly || curSpeedKmh>25;
+
+  if(!best || !moveOk){
+    renderHudIdle();
+    return;
+  }
+
+  const st=camState[best.id];
+  if(bestD<=settings.close && st!=="close"){
+    camState[best.id]="close";
+    speak("שים לב! מצלמת מהירות לפניך. מהירות מותרת "+best.limit);
+    beep([[1100,.12],[1100,.12],[1400,.2]]);
+    vibrate([200,80,200,80,400]);
+  } else if(bestD<=settings.early && !st){
+    camState[best.id]="early";
+    speak("מצלמת מהירות בעוד כ"+roundDist(bestD)+" מטר. מהירות מותרת "+best.limit+" קמ״ש");
+    beep([[900,.15]]);
+    vibrate([150]);
+  }
+  renderHudAlert(best, bestD, camState[best.id]==="close");
+}
+
+function roundDist(d){ return Math.round(d/50)*50; }
+
+function renderHudIdle(){
+  document.body.classList.remove("alert-close");
+  $("hudSign").classList.remove("big","pulse");
+  $("hudSign").innerHTML='<span class="nolimit">אין מצלמה<br>בקרבתך</span>';
+  $("alertTitle").className=""; $("alertTitle").textContent="נוסע... סורק מצלמות בסביבה";
+  $("alertDist").classList.remove("show");
+  $("laneWrap").classList.remove("show");
+  $("curSpeed").classList.remove("over");
+}
+function renderHudAlert(cam, d, danger){
+  const sign=$("hudSign");
+  sign.textContent=cam.limit;
+  sign.classList.add("big");
+  sign.classList.toggle("pulse", danger);
+  const t=$("alertTitle");
+  t.className=danger?"danger":"warn";
+  t.textContent=(danger?"📷 מצלמה לפניך! ":"מתקרב למצלמה: ")+cam.name;
+  const ad=$("alertDist");
+  ad.classList.add("show"); ad.classList.toggle("danger",danger);
+  ad.innerHTML=Math.round(d)+' <small>מטר</small>';
+  $("laneWrap").classList.add("show");
+  const pct=Math.min(100, Math.max(0, 100*(1-d/settings.early)));
+  $("laneFill").style.width=pct+"%";
+  $("laneFill").classList.toggle("danger",danger);
+  $("laneFar").textContent=settings.early+" מ׳";
+  $("curSpeed").classList.toggle("over", curSpeedKmh > cam.limit+2);
+  document.body.classList.toggle("alert-close", danger && curSpeedKmh>cam.limit+2);
+}
+
+/* ================= מצב הדגמה ================= */
+$("demoBtn").addEventListener("click", ()=>{
+  document.querySelector('nav button[data-screen="drive"]').click();
+  // מצלמה וירטואלית 1.5 ק"מ צפונה מנקודת דמו
+  const baseLat=32.0000, baseLon=34.8000;
+  const camLat=baseLat+1500/111320;
+  cams=cams.filter(c=>c.id!=="__demo__");
+  cams.push({id:"__demo__", name:"מצלמת הדגמה", road:"דמו", lat:camLat, lon:baseLon, limit:90, approx:false});
+  startDrive(true);
+  let lat=baseLat, speedKmh=92;
+  curHeading=0;
+  demoTimer=setInterval(()=>{
+    lat += (speedKmh/3.6)/111320; // נסיעה צפונה
+    curSpeedKmh=speedKmh + (Math.random()*4-2);
+    setGps("ok","מצב הדגמה");
+    tick(lat, baseLon);
+    const d=dist(lat,baseLon,camLat,baseLon);
+    if(d<40 || lat>camLat){ clearInterval(demoTimer); demoTimer=null;
+      setTimeout(()=>{ toast("ההדגמה הסתיימה"); stopDrive(); }, 1500);
+    }
+  }, 700);
+});
+
+/* ================= רשימת מצלמות ================= */
+function renderCamList(filter){
+  const q=(filter??$("searchBox").value).trim();
+  const list=$("camList");
+  const here=lastPos;
+  let items=cams.filter(c=>c.id!=="__demo__");
+  if(q) items=items.filter(c=>c.name.includes(q)||String(c.road).includes(q));
+  items.sort((a,b)=>{
+    if(here) return dist(here.lat,here.lon,a.lat,a.lon)-dist(here.lat,here.lon,b.lat,b.lon);
+    return a.name.localeCompare(b.name,"he");
+  });
+  if(!items.length){
+    list.innerHTML='<div class="empty">אין מצלמות במאגר.<br>הוסף מצלמה במיקומך הנוכחי או ידנית 📷</div>';
+    return;
+  }
+  list.innerHTML=items.map(c=>{
+    const d=here?fmtDist(dist(here.lat,here.lon,c.lat,c.lon)):"";
+    return `<div class="cam-row">
+      <div class="mini-sign">${c.limit}</div>
+      <div class="info">
+        <div class="name">${esc(c.name)}</div>
+        <div class="sub"><span>כביש ${esc(String(c.road))}</span>${d?`<span>· ${d} ממך</span>`:""}${c.approx?'<span class="approx">· מיקום משוער</span>':""}</div>
+      </div>
+      <div class="actions">
+        <button class="icon-btn" onclick="editCam('${c.id}')">✏️</button>
+        <button class="icon-btn" onclick="delCam('${c.id}')">🗑️</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+function fmtDist(m){ return m<1000?Math.round(m)+" מ׳":(m/1000).toFixed(1)+' ק״מ'; }
+function esc(s){ return s.replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m])); }
+$("searchBox").addEventListener("input", ()=>renderCamList());
+
+/* הוספה במיקום נוכחי */
+$("addHereBtn").addEventListener("click", ()=>{
+  if(!("geolocation" in navigator)) return toast("אין GPS במכשיר");
+  toast("מאתר מיקום...");
+  navigator.geolocation.getCurrentPosition(p=>{
+    openCamModal(null, {lat:+p.coords.latitude.toFixed(5), lon:+p.coords.longitude.toFixed(5)});
+  }, ()=>toast("לא הצלחתי לאתר מיקום"), {enableHighAccuracy:true, timeout:10000});
+});
+$("addManualBtn").addEventListener("click", ()=>openCamModal(null,{}));
+
+window.editCam=id=>{ const c=cams.find(x=>x.id===id); if(c) openCamModal(c,{}); };
+window.delCam=id=>{
+  const c=cams.find(x=>x.id===id); if(!c) return;
+  if(confirm('למחוק את "'+c.name+'"?')){ cams=cams.filter(x=>x.id!==id); saveCams(); toast("המצלמה נמחקה"); }
+};
+
+function openCamModal(cam, pre){
+  const c=cam||{name:"",road:"",lat:pre.lat??"",lon:pre.lon??"",limit:90};
+  $("modalCard").innerHTML=`
+    <h3>${cam?"עריכת מצלמה":"מצלמה חדשה"}</h3>
+    <div class="field"><label>שם / תיאור</label><input id="f_name" value="${esc(c.name)}" placeholder="למשל: צומת גולני — כביש 65"></div>
+    <div class="row2">
+      <div class="field"><label>כביש</label><input id="f_road" value="${esc(String(c.road))}" placeholder="65"></div>
+      <div class="field"><label>מהירות מותרת (קמ״ש)</label><input id="f_limit" type="number" value="${c.limit}"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>קו רוחב (lat)</label><input id="f_lat" type="number" step="any" value="${c.lat}"></div>
+      <div class="field"><label>קו אורך (lon)</label><input id="f_lon" type="number" step="any" value="${c.lon}"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">ביטול</button>
+      <button class="btn primary" id="saveCamBtn">שמירה</button>
+    </div>`;
+  $("modal").classList.add("show");
+  $("saveCamBtn").addEventListener("click", ()=>{
+    const name=$("f_name").value.trim(), road=$("f_road").value.trim();
+    const lat=parseFloat($("f_lat").value), lon=parseFloat($("f_lon").value), limit=parseInt($("f_limit").value);
+    if(!name||isNaN(lat)||isNaN(lon)||isNaN(limit)) return toast("נא למלא את כל השדות");
+    if(cam){ Object.assign(cam,{name,road,lat,lon,limit,approx:false}); }
+    else cams.push({id:"u"+Date.now(), name, road, lat, lon, limit, approx:false});
+    saveCams(); closeModal(); toast("נשמר ✓");
+  });
+}
+window.closeModal=()=>{ $("modal").classList.remove("show"); };
+$("modal").addEventListener("click", e=>{ if(e.target.id==="modal") closeModal(); });
+
+/* ייצוא / ייבוא */
+$("exportBtn").addEventListener("click", ()=>{
+  const data=JSON.stringify(cams.filter(c=>c.id!=="__demo__"), null, 1);
+  $("modalCard").innerHTML=`
+    <h3>ייצוא מאגר</h3>
+    <div class="field"><label>העתק את הטקסט ושמור אותו</label><textarea readonly id="expTa">${esc(data)}</textarea></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">סגירה</button>
+      <button class="btn primary" id="copyBtn">📋 העתקה</button>
+    </div>`;
+  $("modal").classList.add("show");
+  $("copyBtn").addEventListener("click", async()=>{
+    try{ await navigator.clipboard.writeText(data); toast("הועתק ✓"); }
+    catch(e){ $("expTa").select(); document.execCommand("copy"); toast("הועתק ✓"); }
+  });
+});
+$("importBtn").addEventListener("click", ()=>{
+  $("modalCard").innerHTML=`
+    <h3>ייבוא מאגר</h3>
+    <div class="field"><label>הדבק JSON (ייצוא קודם) או שורות CSV: שם, כביש, lat, lon, מהירות</label>
+    <textarea id="impTa" placeholder='[{"name":"...","road":"65","lat":32.77,"lon":35.32,"limit":90}]'></textarea></div>
+    <div class="set-row" style="border:none;padding:4px 0 12px"><label style="font-size:13px">החלף את המאגר הקיים (אחרת — יתווסף)</label><label class="switch"><input type="checkbox" id="impReplace"><span class="slider"></span></label></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">ביטול</button>
+      <button class="btn primary" id="doImpBtn">ייבוא</button>
+    </div>`;
+  $("modal").classList.add("show");
+  $("doImpBtn").addEventListener("click", ()=>{
+    const txt=$("impTa").value.trim(); if(!txt) return;
+    let items=[];
+    try{
+      if(txt.startsWith("[")||txt.startsWith("{")){
+        const j=JSON.parse(txt);
+        items=(Array.isArray(j)?j:[j]).map(o=>({name:String(o.name||""), road:String(o.road||""), lat:+o.lat, lon:+o.lon, limit:+(o.limit||90)}));
+      } else {
+        items=txt.split(/\n+/).map(l=>{
+          const p=l.split(",").map(s=>s.trim());
+          return {name:p[0], road:p[1]||"", lat:+p[2], lon:+p[3], limit:+(p[4]||90)};
+        });
+      }
+    }catch(e){ return toast("פורמט לא תקין"); }
+    items=items.filter(c=>c.name && !isNaN(c.lat) && !isNaN(c.lon));
+    if(!items.length) return toast("לא נמצאו מצלמות תקינות");
+    items=items.map((c,i)=>({id:"i"+Date.now()+"_"+i, ...c, approx:false}));
+    if($("impReplace").checked) cams=items; else cams=cams.concat(items);
+    saveCams(); closeModal(); toast("יובאו "+items.length+" מצלמות ✓");
+  });
+});
+
+/* ================= הגדרות ================= */
+function bindSet(id, key, isNum){
+  const el=$(id);
+  if(el.type==="checkbox"){ el.checked=settings[key]; el.addEventListener("change",()=>{ settings[key]=el.checked; save(LSK_SET,settings); }); }
+  else { el.value=settings[key]; el.addEventListener("change",()=>{ settings[key]=isNum?+el.value:el.value; save(LSK_SET,settings); }); }
+}
+bindSet("setEarly","early",true); bindSet("setClose","close",true);
+bindSet("setVoice","voice"); bindSet("setBeep","beep"); bindSet("setVibe","vibe");
+bindSet("setWake","wake"); bindSet("setMoveOnly","moveOnly");
+
+/* ================= טוסט ================= */
+let toastT=null;
+function toast(msg){
+  const t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+renderCamList();
+</script>
+</body>
+</html>
