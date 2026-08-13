@@ -13,6 +13,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
 :root{
   --asphalt:#0A0C0F;
@@ -75,10 +77,32 @@ main{flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 12px;display:flex;f
 
 /* ---------- מפה ברקע ---------- */
 #map{
-  position:absolute;inset:0;z-index:0;background:#1a2129;
+  position:absolute;inset:0;z-index:0;background:#0e1216;
 }
+#driveHud.day #map{background:#f6f5f1}
+/* תיקון קווי רשת בין אריחי המפה */
+.leaflet-container .leaflet-tile{width:256.5px!important;height:256.5px!important}
 #driveHud.no-map #map{display:none}
 #driveHud > *:not(#map){position:relative;z-index:2}
+/* סמן ניידת משטרה */
+.police-pin{display:flex;flex-direction:column;align-items:center;filter:drop-shadow(0 3px 6px rgba(0,0,0,.5))}
+.police-pin .sign{
+  width:36px;height:36px;border-radius:50%;background:#1D6FE0;
+  border:4px solid #fff;display:flex;align-items:center;justify-content:center;font-size:17px;
+}
+.police-pin .leg{width:3px;height:9px;background:#5a646e;border-radius:2px}
+.police-pin.hot .sign{animation:policePulse .9s infinite}
+@keyframes policePulse{0%,100%{box-shadow:0 0 0 0 rgba(29,111,224,.6)}50%{box-shadow:0 0 0 20px rgba(29,111,224,0)}}
+/* כפתור דיווח ניידת */
+#reportBtn{
+  position:absolute;bottom:118px;right:14px;z-index:3;
+  background:#1D6FE0;color:#fff;border:2px solid rgba(255,255,255,.85);border-radius:99px;
+  font-family:inherit;font-size:13.5px;font-weight:800;padding:12px 16px;cursor:pointer;
+  display:flex;align-items:center;gap:7px;
+  box-shadow:0 4px 16px rgba(29,111,224,.45);
+}
+#reportBtn:active{transform:scale(.95)}
+#reportBtn .ico{font-size:18px}
 #hudTopFade,#hudBotFade{
   position:absolute;left:0;right:0;z-index:1;pointer-events:none;
 }
@@ -318,6 +342,7 @@ nav button.active{color:var(--amber)}
       <div id="map"></div>
       <div id="hudTopFade"></div>
       <div id="hudBotFade"></div>
+      <button id="reportBtn"><span class="ico">🚓</span>דווח ניידת</button>
       <div id="alertZone">
         <div class="limit-sign" id="hudSign"><span class="nolimit">אין מצלמה<br>בקרבתך</span></div>
         <div id="alertTitle">נוסע... סורק מצלמות בסביבה</div>
@@ -371,6 +396,10 @@ nav button.active{color:var(--amber)}
     </div>
     <div class="set-group">
       <div class="set-row"><label>הכרזה קולית</label><label class="switch"><input type="checkbox" id="setVoice" checked><span class="slider"></span></label></div>
+      <div class="set-row">
+        <div><label>בדיקת קול</label><div class="hint">אם לא שומעים — בדוק עוצמת מדיה וקול עברית ב-Google TTS</div></div>
+        <button class="btn" id="voiceTestBtn">🔊 נסה</button>
+      </div>
       <div class="set-row"><label>צפצוף</label><label class="switch"><input type="checkbox" id="setBeep" checked><span class="slider"></span></label></div>
       <div class="set-row"><label>רטט</label><label class="switch"><input type="checkbox" id="setVibe" checked><span class="slider"></span></label></div>
       <div class="set-row"><label>מסך דולק בזמן נסיעה</label><label class="switch"><input type="checkbox" id="setWake" checked><span class="slider"></span></label></div>
@@ -483,16 +512,28 @@ function beep(pattern){
   });
 }
 function vibrate(p){ if(settings.vibe && navigator.vibrate) navigator.vibrate(p); }
+let heVoice=null;
+function pickVoice(){
+  const vs=speechSynthesis.getVoices();
+  heVoice=vs.find(v=>v.lang==="he-IL")||vs.find(v=>v.lang&&v.lang.toLowerCase().startsWith("he"))||vs.find(v=>v.lang==="iw-IL")||null;
+}
 function speak(text){
   if(!settings.voice || !("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);
-  u.lang="he-IL"; u.rate=1.05;
-  const v=speechSynthesis.getVoices().find(v=>v.lang && v.lang.startsWith("he"));
-  if(v) u.voice=v;
-  speechSynthesis.speak(u);
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang="he-IL"; u.rate=1.05; u.volume=1;
+    if(!heVoice) pickVoice();
+    if(heVoice) u.voice=heVoice;
+    speechSynthesis.speak(u);
+    // תיקון לבאג בכרום: מוודא שהדיבור לא נתקע במצב מושהה
+    setTimeout(()=>{ if(speechSynthesis.paused) speechSynthesis.resume(); }, 150);
+  }catch(e){}
 }
-if("speechSynthesis" in window) speechSynthesis.getVoices();
+if("speechSynthesis" in window){
+  pickVoice();
+  speechSynthesis.onvoiceschanged=pickVoice;
+}
 
 /* ================= מסך מלא ================= */
 function enterFullscreen(){
@@ -516,6 +557,49 @@ async function acquireWake(){
   try{ wakeLock=await navigator.wakeLock.request("screen"); }catch(e){}
 }
 document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible" && driving) acquireWake(); });
+
+/* ================= דיווחי ניידות משטרה ================= */
+/* כדי שהדיווחים ישותפו בין כל המשתמשים: צור פרויקט Firebase עם Realtime Database,
+   והדבק כאן את ה-firebaseConfig שלך (כמו בפרויקטים הקודמים). בלי זה — הדיווחים נשמרים מקומית בלבד. */
+const FIREBASE_CONFIG = null; /* ← הדבק כאן, למשל: { apiKey:"...", databaseURL:"https://xxx.firebasedatabase.app", ... } */
+
+const REPORT_TTL = 45*60*1000; // דיווח פג אחרי 45 דקות
+let reports=[], fbDB=null;
+function initReports(){
+  if(FIREBASE_CONFIG && typeof firebase!=="undefined"){
+    try{
+      firebase.initializeApp(FIREBASE_CONFIG);
+      fbDB=firebase.database();
+      fbDB.ref("police_reports").on("value", snap=>{
+        const v=snap.val()||{}, now=Date.now();
+        reports=Object.entries(v)
+          .map(([id,r])=>({id:"p_"+id, type:"police", name:"ניידת משטרה (דיווח)", lat:+r.lat, lon:+r.lon, ts:+r.ts}))
+          .filter(r=>!isNaN(r.lat)&&!isNaN(r.lon)&&now-r.ts<REPORT_TTL);
+        if(map) drawCamMarkers();
+      });
+      return;
+    }catch(e){ fbDB=null; }
+  }
+  // מצב מקומי — עובד רק במכשיר הזה
+  const now=Date.now();
+  reports=(load("scam_reports_v1",[])||[]).filter(r=>now-r.ts<REPORT_TTL);
+}
+function addReport(lat,lon){
+  const ts=Date.now();
+  if(fbDB){ fbDB.ref("police_reports").push({lat,lon,ts}); }
+  else{
+    reports.push({id:"p_local"+ts, type:"police", name:"ניידת משטרה (דיווח)", lat, lon, ts});
+    save("scam_reports_v1", reports);
+    if(map) drawCamMarkers();
+  }
+  speak("הדיווח התקבל, תודה!");
+  toast("🚓 הניידת דווחה"+(fbDB?" לכל המשתמשים":" (מקומי)"));
+  vibrate([80]);
+}
+function activeReports(){
+  const now=Date.now();
+  return reports.filter(r=>now-r.ts<REPORT_TTL);
+}
 
 /* ================= מפה ================= */
 let map=null, meMarker=null, camMarkers={}, tileLayer=null, curMapNight=null, hotCamId=null;
@@ -551,6 +635,11 @@ function drawCamMarkers(){
   cams.forEach(c=>{
     camMarkers[c.id]=L.marker([c.lat,c.lon],{icon:L.divIcon({className:"",
       html:'<div class="cam-pin" id="pin_'+c.id+'"><div class="sign">'+c.limit+'</div><div class="leg"></div></div>',
+      iconSize:[36,50], iconAnchor:[18,48]}), interactive:false}).addTo(map);
+  });
+  activeReports().forEach(r=>{
+    camMarkers[r.id]=L.marker([r.lat,r.lon],{icon:L.divIcon({className:"",
+      html:'<div class="police-pin" id="pin_'+r.id+'"><div class="sign">🚓</div><div class="leg"></div></div>',
       iconSize:[36,50], iconAnchor:[18,48]}), interactive:false}).addTo(map);
   });
 }
@@ -606,6 +695,7 @@ function startDrive(demo){
   initAudio();
   driving=true;
   enterFullscreen();
+  speak("יוצאים לדרך. נסיעה בטוחה!");
   $("driveIdle").style.display="none";
   $("driveHud").classList.add("on");
   acquireWake();
@@ -659,9 +749,10 @@ function tick(lat,lon){
   if(!map) initMap(lat,lon);
   updateMap(lat,lon);
 
-  // מציאת המצלמה הרלוונטית הקרובה ביותר
+  // מציאת היעד הרלוונטי הקרוב ביותר — מצלמות + דיווחי ניידות
   let best=null, bestD=Infinity;
-  for(const c of cams){
+  const targets=cams.concat(activeReports());
+  for(const c of targets){
     const d=dist(lat,lon,c.lat,c.lon);
     const prev=lastDist[c.id];
     lastDist[c.id]=d;
@@ -688,14 +779,17 @@ function tick(lat,lon){
   setHotCam(best.id);
 
   const st=camState[best.id];
+  const isPolice=best.type==="police";
   if(bestD<=settings.close && st!=="close"){
     camState[best.id]="close";
-    speak("שים לב! מצלמת מהירות לפניך. מהירות מותרת "+best.limit);
+    speak(isPolice ? "שים לב! ניידת משטרה לפניך" : "שים לב! מצלמת מהירות לפניך. מהירות מותרת "+best.limit);
     beep([[1100,.12],[1100,.12],[1400,.2]]);
     vibrate([200,80,200,80,400]);
   } else if(bestD<=settings.early && !st){
     camState[best.id]="early";
-    speak("מצלמת מהירות בעוד כ"+roundDist(bestD)+" מטר. מהירות מותרת "+best.limit+" קמ״ש");
+    speak(isPolice
+      ? "דווחה ניידת משטרה בעוד כ"+roundDist(bestD)+" מטר"
+      : "מצלמת מהירות בעוד כ"+roundDist(bestD)+" מטר. מהירות מותרת "+best.limit+" קמ״ש");
     beep([[900,.15]]);
     vibrate([150]);
   }
@@ -714,13 +808,15 @@ function renderHudIdle(){
   $("curSpeed").classList.remove("over");
 }
 function renderHudAlert(cam, d, danger){
+  const isPolice=cam.type==="police";
   const sign=$("hudSign");
-  sign.textContent=cam.limit;
+  if(isPolice){ sign.innerHTML='<span style="font-size:52px">🚓</span>'; }
+  else sign.textContent=cam.limit;
   sign.classList.add("big");
   sign.classList.toggle("pulse", danger);
   const t=$("alertTitle");
   t.className=danger?"danger":"warn";
-  t.textContent=(danger?"📷 מצלמה לפניך! ":"מתקרב למצלמה: ")+cam.name;
+  t.textContent=(danger?(isPolice?"🚓 ניידת לפניך! ":"📷 מצלמה לפניך! "):(isPolice?"מתקרב לניידת: ":"מתקרב למצלמה: "))+cam.name;
   const ad=$("alertDist");
   ad.classList.add("show"); ad.classList.toggle("danger",danger);
   ad.innerHTML=Math.round(d)+' <small>מטר</small>';
@@ -729,8 +825,9 @@ function renderHudAlert(cam, d, danger){
   $("laneFill").style.width=pct+"%";
   $("laneFill").classList.toggle("danger",danger);
   $("laneFar").textContent=settings.early+" מ׳";
-  $("curSpeed").classList.toggle("over", curSpeedKmh > cam.limit+2);
-  document.body.classList.toggle("alert-close", danger && curSpeedKmh>cam.limit+2);
+  const over=!isPolice && curSpeedKmh > cam.limit+2;
+  $("curSpeed").classList.toggle("over", over);
+  document.body.classList.toggle("alert-close", danger && over);
 }
 
 /* ================= מצב הדגמה ================= */
@@ -904,6 +1001,19 @@ function toast(msg){
   clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"), 2200);
 }
 
+/* דיווח ניידת + בדיקת קול */
+$("reportBtn").addEventListener("click", ()=>{
+  if(lastPos){ addReport(lastPos.lat, lastPos.lon); return; }
+  if(!("geolocation" in navigator)) return toast("אין מיקום זמין");
+  navigator.geolocation.getCurrentPosition(p=>addReport(p.coords.latitude, p.coords.longitude),
+    ()=>toast("לא הצלחתי לאתר מיקום"), {enableHighAccuracy:true, timeout:8000});
+});
+$("voiceTestBtn").addEventListener("click", ()=>{
+  initAudio();
+  speak("בדיקת קול. מצלמת מהירות בעוד שמונה מאות מטר. מהירות מותרת תשעים קמ״ש");
+});
+
+initReports();
 renderCamList();
 </script>
 </body>
